@@ -1,0 +1,54 @@
+-- =====================================================================
+-- 01_setup.sql
+-- Run once as ACCOUNTADMIN. Creates the warehouse, database, schemas,
+-- the ontology owner role and the three persona roles.
+-- =====================================================================
+USE ROLE ACCOUNTADMIN;
+
+-- If Cortex Analyst models are not available in your region, uncomment:
+-- ALTER ACCOUNT SET CORTEX_ENABLED_CROSS_REGION = 'ANY_REGION';
+
+CREATE WAREHOUSE IF NOT EXISTS SC_WH
+  WAREHOUSE_SIZE = 'XSMALL' AUTO_SUSPEND = 60 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = TRUE;
+
+-- Roles: one owner/steward + one role per persona
+CREATE ROLE IF NOT EXISTS SC_ADMIN       COMMENT = 'Ontology owner and data steward';
+CREATE ROLE IF NOT EXISTS SC_PLANNING    COMMENT = 'Persona: supply and demand planning';
+CREATE ROLE IF NOT EXISTS SC_PROCUREMENT COMMENT = 'Persona: procurement and supplier management';
+CREATE ROLE IF NOT EXISTS SC_LOGISTICS   COMMENT = 'Persona: logistics and transport';
+
+GRANT ROLE SC_ADMIN TO ROLE SYSADMIN;
+
+SET my_user = CURRENT_USER();
+GRANT ROLE SC_ADMIN       TO USER IDENTIFIER($my_user);
+GRANT ROLE SC_PLANNING    TO USER IDENTIFIER($my_user);
+GRANT ROLE SC_PROCUREMENT TO USER IDENTIFIER($my_user);
+GRANT ROLE SC_LOGISTICS   TO USER IDENTIFIER($my_user);
+
+CREATE DATABASE IF NOT EXISTS SC_ONTOLOGY;
+GRANT OWNERSHIP ON DATABASE SC_ONTOLOGY TO ROLE SC_ADMIN COPY CURRENT GRANTS;
+
+GRANT USAGE, OPERATE ON WAREHOUSE SC_WH TO ROLE SC_ADMIN;
+GRANT USAGE ON WAREHOUSE SC_WH TO ROLE SC_PLANNING;
+GRANT USAGE ON WAREHOUSE SC_WH TO ROLE SC_PROCUREMENT;
+GRANT USAGE ON WAREHOUSE SC_WH TO ROLE SC_LOGISTICS;
+
+-- Governance privileges for the steward
+GRANT APPLY ROW ACCESS POLICY ON ACCOUNT TO ROLE SC_ADMIN;
+GRANT APPLY MASKING POLICY    ON ACCOUNT TO ROLE SC_ADMIN;
+GRANT APPLY TAG               ON ACCOUNT TO ROLE SC_ADMIN;
+
+-- Cortex (Analyst / Intelligence) access
+GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE SC_ADMIN;
+GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE SC_PLANNING;
+GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE SC_PROCUREMENT;
+GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE SC_LOGISTICS;
+
+-- Schemas (layered architecture)
+USE ROLE SC_ADMIN;
+USE WAREHOUSE SC_WH;
+CREATE SCHEMA IF NOT EXISTS SC_ONTOLOGY.RAW       COMMENT = 'Simulated source systems: ERP, supplier portal, TMS, WMS, IoT gate readers';
+CREATE SCHEMA IF NOT EXISTS SC_ONTOLOGY.CONFORMED COMMENT = 'Ontology-aligned, conformed entities and facts with source lineage';
+CREATE SCHEMA IF NOT EXISTS SC_ONTOLOGY.GOVERNED  COMMENT = 'Semantic view, metric registry, policies, test harness, audit';
+CREATE SCHEMA IF NOT EXISTS SC_ONTOLOGY.LEGACY    COMMENT = 'Each team''s old logic, kept only to demonstrate the before state';
+CREATE SCHEMA IF NOT EXISTS SC_ONTOLOGY.APP       COMMENT = 'Streamlit app';

@@ -1,0 +1,13 @@
+definition_version: 2
+entities:
+  sc_ontology_app:
+    type: streamlit
+    identifier:
+      name: SC_ONTOLOGY_APP
+      database: SC_ONTOLOGY
+      schema: APP
+    query_warehouse: SC_WH
+    title: "Supply chain ontology"
+    main_file: streamlit_app.py
+    artifacts:
+      - streamlit_app.py
